@@ -1,60 +1,85 @@
-import { useState, useEffect } from 'react';
-import { User, Mail, Briefcase, Edit, Save, X, Camera } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { updateUserProfile } from '../../firebase/firestore';
-import DashboardHeader from '../shared/DashboardHeader';
+import { useState, useEffect } from "react";
+import { User, Mail, Briefcase, Edit, Save, X, Camera } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { supabase } from "../../lib/supabaseClient";
+import DashboardHeader from "../shared/DashboardHeader";
 
 const UserProfile = () => {
-  const { currentUser, userProfile, userRole } = useAuth();
+  const { currentUser, userRole } = useAuth();
   const [editMode, setEditMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState({ text: '', type: '' });
+  const [message, setMessage] = useState({ text: "", type: "" });
   const [formData, setFormData] = useState({
-    displayName: '',
-    email: '',
-    bio: '',
-    location: '',
-    phoneNumber: ''
+    displayName: "",
+    email: "",
+    bio: "",
+    location: "",
+    phoneNumber: "",
   });
 
   useEffect(() => {
     if (currentUser) {
-      setFormData({
-        displayName: currentUser.displayName || '',
-        email: currentUser.email || '',
-        bio: userProfile?.bio || '',
-        location: userProfile?.location || '',
-        phoneNumber: userProfile?.phoneNumber || ''
-      });
+      fetchUserProfile();
     }
-  }, [currentUser, userProfile]);
+  }, [currentUser]);
 
+  // Fetch user profile from Supabase
+  const fetchUserProfile = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .single();
+
+      if (error) throw error;
+
+      setFormData({
+        displayName: data.display_name || "",
+        email: currentUser.email || "",
+        bio: data.bio || "",
+        location: data.location || "",
+        phoneNumber: data.phone_number || "",
+      });
+    } catch (err) {
+      console.error("Failed to fetch user profile:", err);
+      setMessage({ text: "Failed to load profile. Please try again.", type: "error" });
+    }
+  };
+
+  // Handle input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({
       ...formData,
-      [name]: value
+      [name]: value,
     });
   };
 
+  // Handle profile update
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setMessage({ text: '', type: '' });
+    setMessage({ text: "", type: "" });
 
     try {
-      await updateUserProfile(currentUser.uid, {
-        displayName: formData.displayName,
-        bio: formData.bio,
-        location: formData.location,
-        phoneNumber: formData.phoneNumber
-      });
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          display_name: formData.displayName,
+          bio: formData.bio,
+          location: formData.location,
+          phone_number: formData.phoneNumber,
+        })
+        .eq("id", currentUser.id);
 
-      setMessage({ text: 'Profile updated successfully!', type: 'success' });
+      if (error) throw error;
+
+      setMessage({ text: "Profile updated successfully!", type: "success" });
       setEditMode(false);
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      setMessage({ text: 'Failed to update profile. Please try again.', type: 'error' });
+    } catch (err) {
+      console.error("Error updating profile:", err);
+      setMessage({ text: "Failed to update profile. Please try again.", type: "error" });
     } finally {
       setIsLoading(false);
     }
@@ -69,19 +94,23 @@ const UserProfile = () => {
           <h1 className="text-3xl font-bold text-indigo-900 mb-8">Your Profile</h1>
 
           {message.text && (
-            <div className={`mb-6 p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+            <div
+              className={`mb-6 p-4 rounded-md ${
+                message.type === "success" ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"
+              }`}
+            >
               {message.text}
             </div>
           )}
 
           <div className="bg-white rounded-xl shadow-sm border border-indigo-100 overflow-hidden">
             <div className="bg-indigo-600 h-32 relative">
-              {currentUser?.photoURL ? (
+              {currentUser?.photo_url ? (
                 <div className="absolute -bottom-16 left-8">
                   <div className="h-32 w-32 rounded-full border-4 border-white overflow-hidden bg-white">
-                    <img 
-                      src={currentUser.photoURL} 
-                      alt={formData.displayName || 'User'}
+                    <img
+                      src={currentUser.photo_url}
+                      alt={formData.displayName || "User"}
                       className="h-full w-full object-cover"
                     />
                   </div>
@@ -93,7 +122,7 @@ const UserProfile = () => {
                   </div>
                 </div>
               )}
-              
+
               {editMode && (
                 <button className="absolute -bottom-8 left-24 bg-indigo-500 text-white p-2 rounded-full hover:bg-indigo-700 transition-colors">
                   <Camera className="h-4 w-4" />
@@ -105,7 +134,7 @@ const UserProfile = () => {
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h2 className="text-2xl font-bold text-indigo-900">
-                    {formData.displayName || 'User Profile'}
+                    {formData.displayName || "User Profile"}
                   </h2>
                   <div className="flex items-center mt-2 text-indigo-600">
                     <Mail className="h-4 w-4 mr-2" />
@@ -116,7 +145,7 @@ const UserProfile = () => {
                     <span className="capitalize">{userRole}</span>
                   </div>
                 </div>
-                
+
                 {editMode ? (
                   <div className="flex space-x-2">
                     <button
@@ -130,7 +159,7 @@ const UserProfile = () => {
                       disabled={isLoading}
                       className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
                     >
-                      {isLoading ? 'Saving...' : (
+                      {isLoading ? "Saving..." : (
                         <>
                           <Save className="mr-2 h-4 w-4" />
                           Save Changes
@@ -222,7 +251,7 @@ const UserProfile = () => {
                       <p className="text-indigo-600">{formData.bio}</p>
                     </div>
                   )}
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {formData.location && (
                       <div className="p-4 bg-indigo-50 rounded-lg">
@@ -230,7 +259,7 @@ const UserProfile = () => {
                         <p className="text-indigo-900">{formData.location}</p>
                       </div>
                     )}
-                    
+
                     {formData.phoneNumber && (
                       <div className="p-4 bg-indigo-50 rounded-lg">
                         <h4 className="text-sm font-medium text-indigo-700 mb-1">Phone</h4>

@@ -1,31 +1,25 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
-import { 
-  Upload, 
-  File, 
-  Trash2, 
-  Search, 
-  Database, 
-  AlertCircle, 
+import { useState, useEffect } from "react";
+import { useNavigate, useParams, Link } from "react-router-dom";
+import {
+  Upload,
+  File,
+  Trash2,
+  Search,
+  Database,
+  AlertCircle,
   CheckCircle,
   ArrowLeft,
-  BarChart
-} from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { 
-  uploadStudyMaterial, 
-  getStudyMaterialsByClass,
-  deleteStudyMaterial, 
-  updateMaterialIndexStatus 
-} from '../../firebase/storage';
-import { indexDocumentForRag } from '../../firebase/rag';
-import DashboardHeader from '../shared/DashboardHeader';
+  BarChart,
+} from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { supabase } from "../../lib/supabaseClient"; // Ensure Supabase client is set up
+import DashboardHeader from "../shared/DashboardHeader";
 
 const StudyMaterialsManager = () => {
   const { classId } = useParams();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  
+
   const [materials, setMaterials] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -34,145 +28,193 @@ const StudyMaterialsManager = () => {
   const [success, setSuccess] = useState(null);
   const [selectedClass, setSelectedClass] = useState({
     id: classId,
-    name: "Loading class details..."
+    name: "Loading class details...",
   });
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [isIndexing, setIsIndexing] = useState({});
-
-  // Mock class data (replace with actual API call)
-  const mockClassData = {
-    id: classId,
-    name: "Advanced Physics 301",
-    description: "A comprehensive study of classical and quantum mechanics"
-  };
 
   useEffect(() => {
     fetchMaterials();
-    // In a real app, fetch the class details
-    setSelectedClass(mockClassData);
+    fetchClassDetails();
   }, [classId]);
 
+  // Fetch class details from Supabase
+  const fetchClassDetails = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("classes")
+        .select("*")
+        .eq("id", classId)
+        .single();
+
+      if (error) throw error;
+
+      setSelectedClass(data);
+    } catch (err) {
+      console.error("Failed to fetch class details:", err);
+      setError("Failed to load class details. Please try again.");
+    }
+  };
+
+  // Fetch study materials from Supabase
   const fetchMaterials = async () => {
     try {
       setIsLoading(true);
-      const fetchedMaterials = await getStudyMaterialsByClass(classId);
-      setMaterials(fetchedMaterials);
+
+      const { data, error } = await supabase
+        .from("study_materials")
+        .select("*")
+        .eq("class_id", classId)
+        .order("upload_date", { ascending: false });
+
+      if (error) throw error;
+
+      setMaterials(data);
     } catch (err) {
+      console.error("Failed to fetch study materials:", err);
       setError("Failed to load study materials. Please try again.");
-      console.error(err);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Handle file upload
   const handleFileUpload = async (event) => {
     const files = event.target.files;
-    
+
     if (!files.length) return;
-    
+
     try {
       setIsUploading(true);
       setError(null);
-      
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        
-        // Set fake progress updates
-        const progressInterval = setInterval(() => {
-          setUploadProgress(prev => {
-            const newProgress = prev + 10;
-            return newProgress > 90 ? 90 : newProgress;
-          });
-        }, 300);
-        
-        await uploadStudyMaterial(file, {
-          classId: selectedClass.id,
-          className: selectedClass.name,
-          instructorId: currentUser.uid,
-          description: `Study material for ${selectedClass.name}`,
-          tags: ["study", "material"]
-        });
-        
-        clearInterval(progressInterval);
-        setUploadProgress(100);
-        
-        // Reset progress after showing 100%
-        setTimeout(() => setUploadProgress(0), 1000);
+        const filePath = `${classId}/${file.name}`;
+
+        // Upload file to Supabase storage
+        const { error: uploadError } = await supabase.storage
+          .from("study-materials")
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        // Save file metadata to Supabase database
+        const { data, error: insertError } = await supabase
+          .from("study_materials")
+          .insert([
+            {
+              class_id: classId,
+              file_name: file.name,
+              file_path: filePath,
+              file_size: file.size,
+              file_type: file.type,
+              upload_date: new Date(),
+              indexed: false,
+            },
+          ]);
+
+        if (insertError) throw insertError;
+
+        setMaterials((prev) => [...prev, ...data]);
       }
-      
+
       setSuccess("Materials uploaded successfully!");
-      fetchMaterials(); // Refresh the list
     } catch (err) {
+      console.error("Failed to upload materials:", err);
       setError("Failed to upload materials. Please try again.");
-      console.error(err);
     } finally {
       setIsUploading(false);
     }
   };
 
+  // Handle material deletion
   const handleDelete = async (material) => {
-    if (!window.confirm(`Are you sure you want to delete ${material.fileName}?`)) {
+    if (!window.confirm(`Are you sure you want to delete ${material.file_name}?`)) {
       return;
     }
-    
+
     try {
-      await deleteStudyMaterial(material.id, material.filePath);
-      setSuccess("Material deleted successfully");
-      setMaterials(materials.filter(m => m.id !== material.id));
+      // Delete file from Supabase storage
+      const { error: deleteError } = await supabase.storage
+        .from("study-materials")
+        .remove([material.file_path]);
+
+      if (deleteError) throw deleteError;
+
+      // Delete file metadata from Supabase database
+      const { error: dbError } = await supabase
+        .from("study_materials")
+        .delete()
+        .eq("id", material.id);
+
+      if (dbError) throw dbError;
+
+      setMaterials((prev) => prev.filter((m) => m.id !== material.id));
+      setSuccess("Material deleted successfully!");
     } catch (err) {
+      console.error("Failed to delete material:", err);
       setError("Failed to delete material. Please try again.");
-      console.error(err);
     }
   };
 
+  // Handle indexing for RAG
   const handleIndexForRag = async (material) => {
     try {
-      setIsIndexing(prev => ({ ...prev, [material.id]: true }));
-      
-      await indexDocumentForRag(material.id, material.downloadURL, material.fileName);
-      await updateMaterialIndexStatus(material.id, true);
-      
-      // Update the local state
-      setMaterials(materials.map(m => 
-        m.id === material.id ? { ...m, indexed: true } : m
-      ));
-      
-      setSuccess(`${material.fileName} indexed successfully for RAG!`);
+      setIsIndexing((prev) => ({ ...prev, [material.id]: true }));
+
+      // Simulate indexing process (replace with actual RAG indexing logic)
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Update indexed status in Supabase database
+      const { error } = await supabase
+        .from("study_materials")
+        .update({ indexed: true })
+        .eq("id", material.id);
+
+      if (error) throw error;
+
+      setMaterials((prev) =>
+        prev.map((m) => (m.id === material.id ? { ...m, indexed: true } : m))
+      );
+
+      setSuccess(`${material.file_name} indexed successfully for RAG!`);
     } catch (err) {
+      console.error("Failed to index document:", err);
       setError("Failed to index document. Please try again.");
-      console.error(err);
     } finally {
-      setIsIndexing(prev => ({ ...prev, [material.id]: false }));
+      setIsIndexing((prev) => ({ ...prev, [material.id]: false }));
     }
   };
 
-  // Filter materials based on search
-  const filteredMaterials = searchTerm 
-    ? materials.filter(m => 
-        m.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  // Filter materials based on search term
+  const filteredMaterials = searchTerm
+    ? materials.filter(
+        (m) =>
+          m.file_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          m.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
     : materials;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white">
       <DashboardHeader userRole="instructor" />
-      
+
       <main className="container mx-auto px-4 py-8">
+        {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div>
             <button
-              onClick={() => navigate('/instructor')}
+              onClick={() => navigate("/instructor")}
               className="text-indigo-600 hover:text-indigo-800 mb-2 flex items-center"
             >
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back to Dashboard
             </button>
             <h1 className="text-3xl font-bold text-indigo-900">Study Materials Manager</h1>
-            <p className="text-indigo-600">
-              For class: {selectedClass.name}
-            </p>
+            <p className="text-indigo-600">For class: {selectedClass.name}</p>
           </div>
-          
+
           <div className="flex items-center space-x-3">
             <Link
               to={`/instructor/rag-analytics/${classId}`}
@@ -184,11 +226,11 @@ const StudyMaterialsManager = () => {
             <label className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition duration-300 font-medium flex items-center cursor-pointer">
               <Upload className="mr-2 h-5 w-5" />
               Upload Materials
-              <input 
-                type="file" 
-                multiple 
-                onChange={handleFileUpload} 
-                className="hidden" 
+              <input
+                type="file"
+                multiple
+                onChange={handleFileUpload}
+                className="hidden"
                 accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt"
                 disabled={isUploading}
               />

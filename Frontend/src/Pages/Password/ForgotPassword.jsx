@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Send, CheckCircle } from "lucide-react";
-import { resetPassword } from "../../firebase/auth";
+import { supabase } from "../../lib/supabaseClient"; // Ensure you have a Supabase client setup
 import Logo from "../../components/Logo";
 
 const ForgotPassword = () => {
@@ -14,26 +14,28 @@ const ForgotPassword = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!email) {
       setError("Please enter your email address");
       return;
     }
-    
+
     setIsLoading(true);
     setError("");
-    
+
     try {
-      await resetPassword(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`, // Replace with your reset password page
+      });
+
+      if (error) {
+        throw error;
+      }
+
       setSuccess(true);
     } catch (err) {
       console.error("Reset password error:", err);
-      
-      if (err.code === "auth/user-not-found") {
-        setError("No account found with this email");
-      } else {
-        setError("Failed to send reset email. Please try again.");
-      }
+      setError(err.message || "Failed to send reset email. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -49,14 +51,14 @@ const ForgotPassword = () => {
           <h1 className="text-2xl font-bold text-gray-800">Reset Your Password</h1>
           <p className="text-gray-600">We'll send you an email with a link to reset your password</p>
         </div>
-        
+
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-md text-sm">
               {error}
             </div>
           )}
-          
+
           {success ? (
             <div className="text-center py-6">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
@@ -88,7 +90,7 @@ const ForgotPassword = () => {
                   required
                 />
               </div>
-              
+
               <button
                 type="submit"
                 disabled={isLoading}
@@ -105,7 +107,7 @@ const ForgotPassword = () => {
             </form>
           )}
         </div>
-        
+
         <div className="text-center">
           <Link to="/login" className="inline-flex items-center text-indigo-600 hover:text-indigo-800 font-medium">
             <ArrowLeft className="w-4 h-4 mr-1" />
