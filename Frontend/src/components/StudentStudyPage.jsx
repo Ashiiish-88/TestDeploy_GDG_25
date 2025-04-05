@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState,useRef } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { 
   ChevronDown, 
@@ -46,6 +46,16 @@ const StudentStudySpace = () => {
 
   const handleGoBack = () => {
     navigate(`/${userRole}`);
+  };
+
+  const StudentStudySpace = () => {
+    const chatContainerRef = useRef(null);
+  
+    useEffect(() => {
+      if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      }
+    }, [messages]); // Trigger scrolling when messages change
   };
 
   const handleSendMessage = async () => {
@@ -296,31 +306,34 @@ const StudentStudySpace = () => {
       </div>
 
       {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-indigo-200 scrollbar-track-transparent hover:scrollbar-thumb-indigo-300">
-        <div className="p-3 space-y-3">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
-                  message.sender === "user" ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-800"
-                }`}
-                onClick={() => handleVideoLinkClick(message)}
-                style={{ cursor: message.sender === "bot" ? "pointer" : "default" }}
-              >
-                {message.text}
-              </div>
-            </div>
-          ))}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-indigo-50 text-indigo-800 rounded-xl px-3 py-2 text-sm">Thinking...</div>
-            </div>
-          )}
+<div
+  className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-indigo-200 scrollbar-track-transparent hover:scrollbar-thumb-indigo-300"
+  ref={chatContainerRef}
+>
+  <div className="p-3 space-y-3">
+    {messages.map((message) => (
+      <div
+        key={message.id}
+        className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
+      >
+        <div
+          className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
+            message.sender === "user" ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-800"
+          }`}
+          onClick={() => handleVideoLinkClick(message)}
+          style={{ cursor: message.sender === "bot" ? "pointer" : "default" }}
+        >
+          {message.text}
         </div>
       </div>
+    ))}
+    {isLoading && (
+      <div className="flex justify-start">
+        <div className="bg-indigo-50 text-indigo-800 rounded-xl px-3 py-2 text-sm">Thinking...</div>
+      </div>
+    )}
+  </div>
+</div>
 
       {/* Input Container */}
       <div className="flex-none p-3 border-t border-indigo-100 bg-white">
