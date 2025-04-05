@@ -26,7 +26,7 @@ const StudentStudySpace = () => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isToolbarOpen, setIsToolbarOpen] = useState(true)
   const [messages, setMessages] = useState([
-    { id: 1, text: "Welcome to your study space! How can I help you today?", sender: "bot" },
+    { id: 1, text: "Hello, I'm balmitra, an AI assistant. 👋 What are you up to today? 🤔", sender: "bot" },
   ])
   const [inputMessage, setInputMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -65,7 +65,7 @@ const StudentStudySpace = () => {
     try {
       console.log("Sending message to API:", currentMessage)
       // Call the Gemini API through our backend
-      const response = await fetch('http://localhost:8000/api/chat', {
+      const response = await fetch('https://edvantage-gdg-25.onrender.com/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
