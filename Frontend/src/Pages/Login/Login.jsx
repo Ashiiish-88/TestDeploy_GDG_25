@@ -110,6 +110,23 @@ const LoginPage = () => {
     }
   };
 
+  const fillCredentials = (role) => {
+    switch (role) {
+      case "admin":
+        setEmail("admin@demo.com");
+        setPassword("admin123");
+        break;
+      case "instructor":
+        setEmail("instructor@demo.com");
+        setPassword("teacher123");
+        break;
+      case "student":
+        setEmail("student@demo.com");
+        setPassword("student123");
+        break;
+    }
+  };
+
   return (
     <div className="min-h-screen relative flex items-center justify-center py-4">
       <Background />
@@ -251,6 +268,50 @@ const LoginPage = () => {
               )}
             </button>
           </form>
+
+          {/* Demo Credentials Card */}
+          <div className="mt-8 p-4 bg-amber-50 border border-amber-200 rounded-lg animate-fadeIn">
+            <h3 className="text-amber-800 font-medium text-sm mb-2">Demo Credentials</h3>
+            <div className="grid grid-cols-1 gap-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-medium text-amber-700 bg-amber-100 px-2 py-1 rounded">Admin</span>
+                  <div className="text-xs text-gray-600 mt-1">admin@demo.com / admin123</div>
+                </div>
+                <button
+                  onClick={() => fillCredentials("admin")}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                  Use
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-medium text-amber-700 bg-amber-100 px-2 py-1 rounded">Instructor</span>
+                  <div className="text-xs text-gray-600 mt-1">instructor@demo.com / teacher123</div>
+                </div>
+                <button
+                  onClick={() => fillCredentials("instructor")}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                  Use
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-medium text-amber-700 bg-amber-100 px-2 py-1 rounded">Student</span>
+                  <div className="text-xs text-gray-600 mt-1">student@demo.com / student123</div>
+                </div>
+                <button
+                  onClick={() => fillCredentials("student")}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                  Use
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-amber-700 mt-3">Click "Use" to automatically fill credentials for quick testing</p>
+          </div>
         </div>
       </div>
     </div>
